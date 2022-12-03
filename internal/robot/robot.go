@@ -92,7 +92,3 @@ func (this *Robot) OpenTrade() error {
 func (this *Robot) CloseTrade() error {
 	return nil
 }
-
-func (this *Robot) Track() error {
-	return nil
-}

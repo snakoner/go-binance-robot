@@ -14,6 +14,6 @@ func main() {
 	robot.Print()
 
 	// binance.WebSocketGetClose(robot)
-	binance.WebSocketRun(robot, "ETH", 500)
+	binance.WebSocketRun(robot, "ADA", 500)
 
 }
