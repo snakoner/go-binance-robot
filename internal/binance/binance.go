@@ -2,7 +2,7 @@ package binance
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"time"
@@ -12,12 +12,13 @@ import (
 	"github.com/go-binance-robot/internal/robot"
 )
 
+// Get N = numberOfKlines historical klines
 func GetHistoricalKlines(r *robot.Robot, symbol string, numberOfKlines int) error {
 	client := binance.NewClient(r.BinanceApiPublic, r.BinanceApiPrivate)
 	klines, err := client.NewKlinesService().Symbol(symbol + r.StableCurrency).
 		Interval(r.Timeframe).Limit(numberOfKlines).Do(context.Background())
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 		return nil
 	}
 
@@ -26,17 +27,19 @@ func GetHistoricalKlines(r *robot.Robot, symbol string, numberOfKlines int) erro
 		klinesFloat[i], _ = strconv.ParseFloat(klines[i].Close, 64)
 	}
 
-	r.ActiveTrade.Close = klinesFloat
-	r.ActiveTrade.LastTime = time.Unix(klines[len(klines)-1].OpenTime/1000, 0)
+	r.TradingSession.Close = klinesFloat
+	r.TradingSession.LastTime = time.Unix(klines[len(klines)-1].OpenTime/1000, 0)
 
 	return nil
 }
 
-func GetPrevLastKline(r *robot.Robot, symbol string) (float64, error) {
+// Get penultimate close price
+func GetPenultimatePrice(r *robot.Robot, symbol string) (float64, error) {
 	client := binance.NewClient(r.BinanceApiPublic, r.BinanceApiPrivate)
 	klines, err := client.NewKlinesService().Symbol(symbol + r.StableCurrency).
 		Interval(r.Timeframe).Limit(2).Do(context.Background())
 	if err != nil {
+		log.Fatal(err)
 		return 0.0, err
 	}
 
@@ -44,11 +47,13 @@ func GetPrevLastKline(r *robot.Robot, symbol string) (float64, error) {
 	return price, nil
 }
 
-func GetLastKline(r *robot.Robot, symbol string) (float64, error) {
+// Get last close price
+func GetLastPrice(r *robot.Robot, symbol string) (float64, error) {
 	client := binance.NewClient(r.BinanceApiPublic, r.BinanceApiPrivate)
 	klines, err := client.NewKlinesService().Symbol(symbol + r.StableCurrency).
 		Interval(r.Timeframe).Limit(1).Do(context.Background())
 	if err != nil {
+		log.Fatal(err)
 		return 0.0, err
 	}
 
@@ -56,6 +61,7 @@ func GetLastKline(r *robot.Robot, symbol string) (float64, error) {
 	return price, nil
 }
 
+// Goroutine function to return time and close price for token
 func WebSocketTracking(r *robot.Robot, symbol string, close chan float64, t chan time.Time) {
 
 	wsKlineHandler := func(event *binance.WsKlineEvent) {
@@ -65,23 +71,26 @@ func WebSocketTracking(r *robot.Robot, symbol string, close chan float64, t chan
 	}
 
 	errHandler := func(err error) {
-		fmt.Println(err)
+		log.Println(err)
+		return
 	}
 
 	doneC, _, err := binance.WsKlineServe(symbol+r.StableCurrency, r.Timeframe, wsKlineHandler, errHandler)
 
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 		return
 	}
 	<-doneC
 }
 
+// Function to run from main
 func WebSocketRun(r *robot.Robot, symbol string, numberOfKlines int) {
 	// if no close data - get close data
-	if len(r.ActiveTrade.Close) == 0 {
+	if len(r.TradingSession.Close) == 0 {
 		err := GetHistoricalKlines(r, symbol, numberOfKlines)
 		if err != nil {
+			log.Fatal(err)
 			return
 		}
 	}
@@ -96,51 +105,58 @@ func WebSocketRun(r *robot.Robot, symbol string, numberOfKlines int) {
 		curr = <-close
 		tm = <-t
 		if curr != prev {
-			r.ActiveTrade.Close[len(r.ActiveTrade.Close)-1] = curr
-			r.ActiveTrade.CurrentPrice = curr
+			r.TradingSession.Close[len(r.TradingSession.Close)-1] = curr
 
-			if tm != r.ActiveTrade.LastTime {
-				price, _ := GetPrevLastKline(r, symbol)
-				r.ActiveTrade.Close[len(r.ActiveTrade.Close)-1] = price
-				r.ActiveTrade.Close = append(r.ActiveTrade.Close, curr)
-				r.ActiveTrade.Close = r.ActiveTrade.Close[1:]
+			if tm != r.TradingSession.LastTime {
+				price, _ := GetPenultimatePrice(r, symbol)
+				r.TradingSession.Close[len(r.TradingSession.Close)-1] = price
+				r.TradingSession.Close = append(r.TradingSession.Close, curr)
+				r.TradingSession.Close = r.TradingSession.Close[1:]
 			}
-			fmt.Println(r.ActiveTrade.Close[len(r.ActiveTrade.Close)-2:])
-			r.ActiveTrade.LastTime = tm
-			// fmt.Printf("Last time: %v, Time: %v\n", r.ActiveTrade.LastTime, tm)
-			// fmt.Println("Cur price: ", curr)
-			// fmt.Printf("Len: %d\n", len(r.ActiveTrade.Close))
-			// estimator calculute
-			fmt.Printf("%f %f\n", r.ActiveTrade.Close[len(r.ActiveTrade.Close)-2], r.ActiveTrade.Close[len(r.ActiveTrade.Close)-1])
-			result, err := indicators.Envelope(r.ActiveTrade.Close, true)
+			r.TradingSession.LastTime = tm
+			result, err := indicators.Envelope(r.TradingSession.Close, true)
 			if err != nil {
-				fmt.Println(err)
+				log.Fatal(err)
 				return
 			}
-			fmt.Println("Result of long: ", result)
-			if result && r.ActiveTrade.Active == false {
-				// buy and set fields
-				r.ActiveTrade.Active = true
-				r.ActiveTrade.OpenPrice, _ = GetLastKline(r, symbol)
+			log.Println(r.TradingSession.Close[len(r.TradingSession.Close)-2:], "long: ", result)
+			if result && r.TradingSession.Active == false {
+				// [todo] buy and set fields
+				r.TradingSession.Active = true
+				r.TradingSession.Token = symbol
+				r.TradingSession.BuyValue = r.StartBalance // [todo]
+				r.TradingSession.OpenPrice, _ = GetLastPrice(r, symbol)
+				r.TradingSession.Result.StartTime = time.Now()
 				break
 			}
 		}
 		prev = curr
 	}
 
-	if r.ActiveTrade.Active == true {
-		price := <-close
-		change := (price - r.ActiveTrade.OpenPrice) / r.ActiveTrade.OpenPrice
-		if change < 0 {
-			if math.Abs(change) >= r.StopLoss {
-				// sell with loss
-				fmt.Println("Deal is closed with loss: ", change)
-			}
-		} else {
-			if change >= r.TakeProfit {
-				// sell with profit
-				fmt.Println("Deal is closed with profit: ", change)
+	// main trading session
+	if r.TradingSession.Active == true {
+		for r.TradingSession.Active {
+			price := <-close
+			priceChange := (price - r.TradingSession.OpenPrice) / r.TradingSession.OpenPrice
+			log.Printf("Change: %f\n", priceChange*100.0)
+			if priceChange < 0 {
+				if math.Abs(priceChange) >= r.StopLoss {
+					// [todo] sell with loss
+					r.TradingSession.Active = false
+					r.TradingSession.Result.EndTime = time.Now()
+					r.TradingSession.Result.Profit = priceChange
+					log.Println("Deal is closed with loss: ", priceChange)
+				}
+			} else {
+				if priceChange >= r.TakeProfit {
+					// [todo] sell with profit
+					r.TradingSession.Active = false
+					r.TradingSession.Result.EndTime = time.Now()
+					r.TradingSession.Result.Profit = priceChange
+					log.Println("Deal is closed with profit: ", priceChange)
+				}
 			}
 		}
+
 	}
 }

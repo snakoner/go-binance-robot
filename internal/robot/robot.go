@@ -26,22 +26,23 @@ type Robot struct {
 	StartBalance      float64 /* value to buy on */
 	TakeProfit        float64 /* take profit value in percent */
 	StopLoss          float64 /* stop loss value in percent */
-	ActiveTrade       Trade
+	TradingSession    Trade
 }
 
 type Trade struct {
-	Active       bool    /* deal is active or not */
-	Token        string  /* token name */
-	BuyValue     float64 /* value bought on */
-	OpenPrice    float64 /* deal open price */
-	CurrentPrice float64 /* [deprecated] current price of token in stablecoin */
-	LastTime     time.Time
-	Close        []float64 /* actual candle close counts */
+	Active    bool      /* deal is active or not */
+	Token     string    /* token name */
+	BuyValue  float64   /* value bought on */
+	OpenPrice float64   /* deal open price */
+	LastTime  time.Time /* time of last price */
+	Close     []float64 /* actual candle close counts */
+	Result    TradingResult
 }
 
-type Roboter interface {
-	OpenTrade() error
-	CloseTrade() error
+type TradingResult struct {
+	Profit    float64
+	StartTime time.Time
+	EndTime   time.Time
 }
 
 func New() *Robot {
@@ -71,24 +72,17 @@ func New() *Robot {
 }
 
 func (r *Robot) Print() {
-	fmt.Println("name: ", r.Name)                              /* name of robot */
-	fmt.Println("api_private: ", r.BinanceApiPrivate[:10]+"*") /* binance api_secret_key */
-	fmt.Println("api_public: ", r.BinanceApiPublic[:10]+"*")   /* binance api_public_key */
-	fmt.Println("stable_currency: ", r.StableCurrency)         /* stable_currency : USDT or BUSD */
-	fmt.Println("tokens: ", r.Tokens)                          /* tokens : ETH,BTC,... */
-	fmt.Println("strategy: ", r.Strategy)                      /* strategy : divergence, rsi, envelope */
-	fmt.Println("long: ", r.CheckLong)                         /* open long position */
-	fmt.Println("short: ", r.CheckShort)
-	fmt.Println("futures: ", r.IsFutures)
-	fmt.Println("start_balance: ", r.StartBalance)
-	fmt.Println("stop_loss: ", r.StopLoss)
-	fmt.Println("take_profit: ", r.TakeProfit)
-}
-
-func (this *Robot) OpenTrade() error {
-	return nil
-}
-
-func (this *Robot) CloseTrade() error {
-	return nil
+	fmt.Println(strings.ToUpper("name: "), r.Name)                              /* name of robot */
+	fmt.Println(strings.ToUpper("api_private: "), r.BinanceApiPrivate[:10]+"*") /* binance api_secret_key */
+	fmt.Println(strings.ToUpper("api_public: "), r.BinanceApiPublic[:10]+"*")   /* binance api_public_key */
+	fmt.Println(strings.ToUpper("stable_currency: "), r.StableCurrency)         /* stable_currency : USDT or BUSD */
+	fmt.Println(strings.ToUpper("tokens: "), r.Tokens)                          /* tokens : ETH,BTC,... */
+	fmt.Println(strings.ToUpper("strategy: "), r.Strategy)                      /* strategy : divergence, rsi, envelope */
+	fmt.Println(strings.ToUpper("long: "), r.CheckLong)                         /* open long position */
+	fmt.Println(strings.ToUpper("short: "), r.CheckShort)
+	fmt.Println(strings.ToUpper("futures: "), r.IsFutures)
+	fmt.Println(strings.ToUpper("start_balance: "), r.StartBalance)
+	fmt.Println(strings.ToUpper("stop_loss: "), r.StopLoss)
+	fmt.Println(strings.ToUpper("take_profit: "), r.TakeProfit)
+	fmt.Println()
 }
