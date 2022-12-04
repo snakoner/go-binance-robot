@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2"
-	"github.com/go-binance-robot/internal/indicators"
 	"github.com/go-binance-robot/internal/robot"
 )
 
@@ -114,11 +113,8 @@ func WebSocketRun(r *robot.Robot, symbol string, numberOfKlines int) {
 				r.TradingSession.Close = r.TradingSession.Close[1:]
 			}
 			r.TradingSession.LastTime = tm
-			result, err := indicators.Envelope(r.TradingSession.Close, true)
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
+			result, _ := r.StrategyFunc(r.TradingSession.Close)
+
 			log.Println(r.TradingSession.Close[len(r.TradingSession.Close)-2:], "long: ", result)
 			if result && r.TradingSession.Active == false {
 				// [todo] buy and set fields

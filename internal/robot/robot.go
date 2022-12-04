@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-binance-robot/internal/indicators"
 	"github.com/joho/godotenv"
 )
 
@@ -26,6 +27,7 @@ type Robot struct {
 	StartBalance      float64 /* value to buy on */
 	TakeProfit        float64 /* take profit value in percent */
 	StopLoss          float64 /* stop loss value in percent */
+	StrategyFunc      func([]float64) (bool, bool)
 	TradingSession    Trade
 }
 
@@ -67,6 +69,18 @@ func New() *Robot {
 	robot.StartBalance, _ = strconv.ParseFloat(os.Getenv("start_balance"), 64)
 	robot.TakeProfit, _ = strconv.ParseFloat(os.Getenv("take_profit"), 64)
 	robot.StopLoss, _ = strconv.ParseFloat(os.Getenv("stop_loss"), 64)
+
+	switch robot.Strategy {
+	case "envelope":
+		robot.StrategyFunc = indicators.Envelope
+		break
+	case "divergence":
+		robot.StrategyFunc = indicators.Divergence
+		break
+	default:
+		log.Fatal("Unknown strategy. Please, check .env file")
+		return nil
+	}
 
 	return robot
 }

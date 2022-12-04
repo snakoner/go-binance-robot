@@ -2,8 +2,6 @@ package indicators
 
 import (
 	"math"
-
-	"github.com/go-binance-robot/internal/errno"
 )
 
 const (
@@ -12,11 +10,11 @@ const (
 	envelopeMult = 3
 )
 
-func Envelope(data []float64, calcLong bool) (bool, error) {
+func Envelope(data []float64) (bool, bool) {
 	if len(data) >= envelopeLen {
 		data = data[len(data)-envelopeLen:]
 	} else {
-		return false, errno.ErrEnvelopeLen
+		return false, false
 	}
 
 	up := make([]float64, len(data))
@@ -44,13 +42,8 @@ func Envelope(data []float64, calcLong bool) (bool, error) {
 		down[i] = y[i] - mae
 	}
 
-	result := false
+	long := data[len(data)-1] >= up[len(data)-1]
+	short := data[len(data)-1] <= down[len(data)-1]
 
-	if calcLong {
-		result = data[len(data)-1] >= up[len(data)-1]
-	} else {
-		result = data[len(data)-1] <= down[len(data)-1]
-	}
-
-	return result, nil
+	return long, short
 }
