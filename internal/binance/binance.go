@@ -2,13 +2,14 @@ package binance
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"math"
 	"strconv"
 	"time"
 
 	"github.com/adshao/go-binance/v2"
 	"github.com/go-binance-robot/internal/robot"
+	"github.com/go-binance-robot/internal/trailing"
 )
 
 // Get N = numberOfKlines historical klines
@@ -100,6 +101,7 @@ func WebSocketRun(r *robot.Robot, symbol string, numberOfKlines int) {
 
 	var prev, curr float64
 	var tm time.Time
+
 	for {
 		curr = <-close
 		tm = <-t
@@ -114,44 +116,67 @@ func WebSocketRun(r *robot.Robot, symbol string, numberOfKlines int) {
 			}
 			r.TradingSession.LastTime = tm
 			result, _ := r.StrategyFunc(r.TradingSession.Close)
+			result = true
 
-			log.Println(r.TradingSession.Close[len(r.TradingSession.Close)-2:], "long: ", result)
+			// log.Println(r.TradingSession.Close[len(r.TradingSession.Close)-2:], "long: ", result)
+
 			if result && r.TradingSession.Active == false {
-				// [todo] buy and set fields
+				// [todo] buy, set sl and tp and set fields
 				r.TradingSession.Active = true
 				r.TradingSession.Token = symbol
 				r.TradingSession.BuyValue = r.StartBalance // [todo]
 				r.TradingSession.OpenPrice, _ = GetLastPrice(r, symbol)
+				r.TradingSession.StopLossValue = (1 - r.StopLoss/100.0) * r.TradingSession.OpenPrice
+				r.TradingSession.TakeProfitValue = (1 + r.TakeProfit/100.0) * r.TradingSession.OpenPrice
 				r.TradingSession.Result.StartTime = time.Now()
+				r.TradingSession.LastPriceForSLChange = r.TradingSession.OpenPrice
 				break
 			}
 		}
 		prev = curr
 	}
 
+	// fmt.Println(r.TradingSession.Active)
+	// fmt.Println(r.TradingSession.BuyValue)
+	// fmt.Println(r.TradingSession.OpenPrice)
+	// fmt.Println(r.TradingSession.StopLossValue)
+	// fmt.Println(r.TradingSession.TakeProfitValue)
+
 	// main trading session
-	if r.TradingSession.Active == true {
+	if r.TradingSession.Active {
 		for r.TradingSession.Active {
-			price := <-close
-			priceChange := (price - r.TradingSession.OpenPrice) / r.TradingSession.OpenPrice
-			log.Printf("Change: %f\n", priceChange*100.0)
-			if priceChange < 0 {
-				if math.Abs(priceChange) >= r.StopLoss {
-					// [todo] sell with loss
-					r.TradingSession.Active = false
-					r.TradingSession.Result.EndTime = time.Now()
-					r.TradingSession.Result.Profit = priceChange
-					log.Println("Deal is closed with loss: ", priceChange)
-				}
-			} else {
-				if priceChange >= r.TakeProfit {
-					// [todo] sell with profit
-					r.TradingSession.Active = false
-					r.TradingSession.Result.EndTime = time.Now()
-					r.TradingSession.Result.Profit = priceChange
-					log.Println("Deal is closed with profit: ", priceChange)
-				}
+			prev = curr
+			// fmt.Println("Waiting for change 0")
+			curr = <-close
+			<-t
+			// fmt.Println("Waiting for change 1")
+			priceChange := curr - r.TradingSession.BuyValue
+			if curr <= r.TradingSession.StopLossValue {
+				// [todo] sell with loss
+				r.TradingSession.Active = false
+				r.TradingSession.Result.EndTime = time.Now()
+				r.TradingSession.Result.Profit = priceChange
+				log.Println("Deal is closed with loss: ", priceChange)
+				break
+			} else if curr >= r.TradingSession.TakeProfitValue { // [todo] sell with profit
+				r.TradingSession.Active = false
+				r.TradingSession.Result.EndTime = time.Now()
+				r.TradingSession.Result.Profit = priceChange
+				log.Println("Deal is closed with profit: ", priceChange)
+				break
 			}
+
+			diff := curr - r.TradingSession.LastPriceForSLChange
+			prev = curr
+			fmt.Println("Price: ", curr)
+			fmt.Printf("Diff: %.5f\n", diff)
+
+			if trailing.RecalcTrailingStop(r, diff) {
+				// change OCO order
+				fmt.Printf("SL: %f, TP:%f\n", r.TradingSession.StopLossValue, r.TradingSession.TakeProfitValue)
+				r.TradingSession.LastPriceForSLChange = curr
+			}
+			fmt.Println()
 		}
 
 	}
