@@ -130,6 +130,7 @@ func WebSocketRun(r *robot.Robot, symbol string, numberOfKlines int) {
 				r.TradingSession.TakeProfitValue = (1 + r.TakeProfit/100.0) * r.TradingSession.OpenPrice
 				r.TradingSession.Result.StartTime = time.Now()
 				r.TradingSession.LastPriceForSLChange = r.TradingSession.OpenPrice
+				r.TradingSession.Quantity = r.TradingSession.BuyValue / r.TradingSession.OpenPrice
 				break
 			}
 		}
@@ -150,7 +151,8 @@ func WebSocketRun(r *robot.Robot, symbol string, numberOfKlines int) {
 			curr = <-close
 			<-t
 			// fmt.Println("Waiting for change 1")
-			priceChange := curr - r.TradingSession.BuyValue
+			priceChange := r.TradingSession.Quantity*curr - r.TradingSession.BuyValue
+			fmt.Printf("Price change from beginning: %.4f\n", priceChange)
 			if curr <= r.TradingSession.StopLossValue {
 				// [todo] sell with loss
 				r.TradingSession.Active = false

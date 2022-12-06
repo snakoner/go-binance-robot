@@ -32,10 +32,11 @@ type Robot struct {
 }
 
 type Trade struct {
-	Active               bool      /* deal is active or not */
-	Token                string    /* token name */
-	BuyValue             float64   /* value bought on */
-	OpenPrice            float64   /* deal open price */
+	Active               bool    /* deal is active or not */
+	Token                string  /* token name */
+	BuyValue             float64 /* value bought on */
+	OpenPrice            float64 /* deal open price */
+	Quantity             float64
 	LastTime             time.Time /* time of last price */
 	Close                []float64 /* actual candle close counts */
 	StopLossValue        float64
