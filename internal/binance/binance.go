@@ -86,13 +86,10 @@ func WebSocketTracking(r *robot.Robot, symbol string, close chan float64, t chan
 
 // Function to run from main
 func WebSocketRun(r *robot.Robot, symbol string, numberOfKlines int) {
-	// if no close data - get close data
-	if len(r.TradingSession.Close) == 0 {
-		err := GetHistoricalKlines(r, symbol, numberOfKlines)
-		if err != nil {
-			log.Fatal(err)
-			return
-		}
+	// get data	
+	if err := GetHistoricalKlines(r, symbol, numberOfKlines); err != nil {
+		log.Fatal(err)
+		return
 	}
 	// web socket tracking
 	close := make(chan float64)
