@@ -15,7 +15,7 @@ type Strategy struct {
   Elements []*StrategyElement
 }
 
-func NewStrategy() *Strategy {
+func New() *Strategy {
   return &Strategy {}
 }
 
