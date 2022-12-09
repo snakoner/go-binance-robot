@@ -1,5 +1,9 @@
 package strategies
 
+import (
+  "sync"
+)
+
 type StrategyElement struct {
   Func []func([]float64) (bool, bool)
   Long bool
@@ -7,7 +11,7 @@ type StrategyElement struct {
 }
 
 type Strategy struct {
-  Elements []StrategyElement
+  Elements []*StrategyElement
 }
 
 func NewStrategy() *Strategy {
@@ -23,9 +27,15 @@ func (this *Strategy) Add(f func([]float64)(bool, bool)) {
 
 // Calculate if long, short OK for each strategy element
 func (this *Strategy) Apply(data []float64) {
+  wg := new(sync.WaitGroup)
   for _, se := range this.Elements {
-    se.Long, se.Short = se.Func(data)
+    wg.Add(1)
+    go func(se *StrategyElement) {  
+      se.Long, se.Short = se.Func(data)
+      wg.Done()
+    }(se)
   }
+  wg.Wait()
 }
 
 func (this *Strategy) IsLong() bool {
