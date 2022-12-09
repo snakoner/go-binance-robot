@@ -1,2 +1,6 @@
 /cmd/app/py
 /cmd/app/.env
+
+.DS_Store
+/cmd/.DS_Store
+/cmd/app/.DS_Store
