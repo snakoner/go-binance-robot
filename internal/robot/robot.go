@@ -19,7 +19,7 @@ type Robot struct {
 	BinanceApiPublic  string   /* binance api_public_key */
 	StableCurrency    string   /* stable_currency : USDT or BUSD */
 	Tokens            []string /* tokens : ETH,BTC,... */
-	Strategy          string   /* strategy : divergence, rsi, envelope */
+	StrategyNames     []string   /* strategy : divergence, rsi, envelope */
 	CheckLong         bool     /* open long position */
 	CheckShort        bool     /* open short position */
 	Timeframe         string
@@ -27,8 +27,8 @@ type Robot struct {
 	StartBalance      float64 /* value to buy on */
 	TakeProfit        float64 /* take profit value in percent */
 	StopLoss          float64 /* stop loss value in percent */
-	StrategyFunc      func([]float64) (bool, bool)
 	TradingSession    Trade
+	Strategy	  Strategy
 }
 
 type Trade struct {
@@ -65,7 +65,7 @@ func New() *Robot {
 	robot.BinanceApiPublic = os.Getenv("binance_api_public")
 	robot.StableCurrency = os.Getenv("stable_currency")
 	robot.Tokens = strings.Split(os.Getenv("tokens"), ",")
-	robot.Strategy = os.Getenv("strategy")
+	robot.StrategyNames = strings.Split(os.Getenv("strategies"), ",")
 	robot.CheckLong, _ = strconv.ParseBool(os.Getenv("check_long"))
 	robot.CheckShort, _ = strconv.ParseBool(os.Getenv("check_short"))
 	robot.Timeframe = os.Getenv("timeframe")
@@ -73,18 +73,24 @@ func New() *Robot {
 	robot.StartBalance, _ = strconv.ParseFloat(os.Getenv("start_balance"), 64)
 	robot.TakeProfit, _ = strconv.ParseFloat(os.Getenv("take_profit"), 64)
 	robot.StopLoss, _ = strconv.ParseFloat(os.Getenv("stop_loss"), 64)
-
-	switch robot.Strategy {
-	case "envelope":
-		robot.StrategyFunc = indicators.Envelope
-		break
-	case "divergence":
-		robot.StrategyFunc = indicators.Divergence
-		break
-	default:
-		log.Fatal("Unknown strategy. Please, check .env file")
-		return nil
+	robot.Strategy = strategy.New()
+	
+	for _, name := range StrategyNames {
+		switch str{
+			case "envelope":
+				robot.Strategy.Add(indicators.Envelope, name)
+				break
+			case "divergence":
+				robot.Strategy.Add(indicators.Divergence, name)
+				break
+			case "rsi":
+				//robot.Strategy.Add(indicators.Rsi, name)
+				break
+			default:
+			log.Fatalf("Unknown indicator: %s\n", name)
+		}
 	}
+	
 
 	return robot
 }
@@ -95,7 +101,7 @@ func (r *Robot) Print() {
 	fmt.Println(strings.ToUpper("api_public: "), r.BinanceApiPublic[:10]+"*")   /* binance api_public_key */
 	fmt.Println(strings.ToUpper("stable_currency: "), r.StableCurrency)         /* stable_currency : USDT or BUSD */
 	fmt.Println(strings.ToUpper("tokens: "), r.Tokens)                          /* tokens : ETH,BTC,... */
-	fmt.Println(strings.ToUpper("strategy: "), r.Strategy)                      /* strategy : divergence, rsi, envelope */
+	fmt.Println(strings.ToUpper("strategy: "), r.StrategyNames)                      /* strategy : divergence, rsi, envelope */
 	fmt.Println(strings.ToUpper("long: "), r.CheckLong)                         /* open long position */
 	fmt.Println(strings.ToUpper("short: "), r.CheckShort)
 	fmt.Println(strings.ToUpper("futures: "), r.IsFutures)
