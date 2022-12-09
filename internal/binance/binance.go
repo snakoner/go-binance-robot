@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2"
+	"github.com/go-binance-robot/internal/logger"
 	"github.com/go-binance-robot/internal/robot"
 	"github.com/go-binance-robot/internal/trailing"
 )
@@ -63,7 +64,7 @@ func GetLastPrice(r *robot.Robot, symbol string) (float64, error) {
 
 // Goroutine function to return time and close price for token
 func WebSocketTracking(r *robot.Robot, symbol string, close chan float64, t chan time.Time) {
-
+	fmt.Println("Web socket is running")
 	wsKlineHandler := func(event *binance.WsKlineEvent) {
 		currClose, _ := strconv.ParseFloat(event.Kline.Close, 64)
 		close <- currClose
@@ -86,11 +87,17 @@ func WebSocketTracking(r *robot.Robot, symbol string, close chan float64, t chan
 
 // Function to run from main
 func WebSocketRun(r *robot.Robot, symbol string, numberOfKlines int) {
-	// get data	
+	// for logger
+	var s string
+	logger := logger.New("../../envelope.log")
+	logger.Open()
+	// get data
 	if err := GetHistoricalKlines(r, symbol, numberOfKlines); err != nil {
 		log.Fatal(err)
 		return
 	}
+
+	fmt.Println("Hello")
 	// web socket tracking
 	close := make(chan float64)
 	t := make(chan time.Time)
@@ -111,9 +118,18 @@ func WebSocketRun(r *robot.Robot, symbol string, numberOfKlines int) {
 				r.TradingSession.Close = append(r.TradingSession.Close, curr)
 				r.TradingSession.Close = r.TradingSession.Close[1:]
 			}
+
+			fmt.Println(prev, curr)
 			r.TradingSession.LastTime = tm
-			result, _ := r.StrategyFunc(r.TradingSession.Close)
-			result = true
+			r.Strategy.Apply(r.TradingSession.Close)
+			result := r.Strategy.IsLong()
+			fmt.Println(result)
+			if result {
+				s = "Envelope long OK"
+				logger.Write(s)
+			}
+
+			// result = true
 
 			// log.Println(r.TradingSession.Close[len(r.TradingSession.Close)-2:], "long: ", result)
 
@@ -134,12 +150,6 @@ func WebSocketRun(r *robot.Robot, symbol string, numberOfKlines int) {
 		prev = curr
 	}
 
-	// fmt.Println(r.TradingSession.Active)
-	// fmt.Println(r.TradingSession.BuyValue)
-	// fmt.Println(r.TradingSession.OpenPrice)
-	// fmt.Println(r.TradingSession.StopLossValue)
-	// fmt.Println(r.TradingSession.TakeProfitValue)
-
 	// main trading session
 	if r.TradingSession.Active {
 		for r.TradingSession.Active {
@@ -149,30 +159,51 @@ func WebSocketRun(r *robot.Robot, symbol string, numberOfKlines int) {
 			<-t
 			// fmt.Println("Waiting for change 1")
 			priceChange := r.TradingSession.Quantity*curr - r.TradingSession.BuyValue
-			fmt.Printf("Price change from beginning: %.4f\n", priceChange)
+			// s = fmt.Sprintf("Price change from beginning: %.4f", priceChange)
+			// logger.Write(s)
 			if curr <= r.TradingSession.StopLossValue {
 				// [todo] sell with loss
 				r.TradingSession.Active = false
 				r.TradingSession.Result.EndTime = time.Now()
 				r.TradingSession.Result.Profit = priceChange
-				log.Println("Deal is closed with loss: ", priceChange)
+				s = fmt.Sprint("##########\nClose deal\n###########")
+				logger.Write(s)
+
+				s = fmt.Sprintf("SL: %f, TP:%f", r.TradingSession.StopLossValue, r.TradingSession.TakeProfitValue)
+				logger.Write(s)
+
+				s = fmt.Sprintf("Deal is closed due SL: %f", priceChange)
+				logger.Write(s)
+
 				break
 			} else if curr >= r.TradingSession.TakeProfitValue { // [todo] sell with profit
 				r.TradingSession.Active = false
 				r.TradingSession.Result.EndTime = time.Now()
 				r.TradingSession.Result.Profit = priceChange
-				log.Println("Deal is closed with profit: ", priceChange)
+				s = fmt.Sprint("##########\nClose deal\n###########")
+				logger.Write(s)
+
+				s = fmt.Sprintf("SL: %f, TP:%f", r.TradingSession.StopLossValue, r.TradingSession.TakeProfitValue)
+				logger.Write(s)
+
+				s = fmt.Sprintf("Deal is closed due TP: %f", priceChange)
+				logger.Write(s)
+
 				break
 			}
 
 			diff := curr - r.TradingSession.LastPriceForSLChange
 			prev = curr
-			fmt.Println("Price: ", curr)
-			fmt.Printf("Diff: %.5f\n", diff)
+			s = fmt.Sprintf("Price: %f", curr)
+			logger.Write(s)
+
+			// s = fmt.Sprintf("Diff: %.5f", diff)
+			// logger.Write(s)
 
 			if trailing.RecalcTrailingStop(r, diff) {
 				// change OCO order
-				fmt.Printf("SL: %f, TP:%f\n", r.TradingSession.StopLossValue, r.TradingSession.TakeProfitValue)
+				s = fmt.Sprintf("SL: %f, TP:%f", r.TradingSession.StopLossValue, r.TradingSession.TakeProfitValue)
+				logger.Write(s)
 				r.TradingSession.LastPriceForSLChange = curr
 			}
 			fmt.Println()
