@@ -42,8 +42,8 @@ func Envelope(data []float64) (bool, bool) {
 		down[i] = y[i] - mae
 	}
 
-	long := data[len(data)-1] >= up[len(data)-1]
-	short := data[len(data)-1] <= down[len(data)-1]
+	long := data[len(data)-1] <= down[len(data)-1]
+	short := data[len(data)-1] >= up[len(data)-1]
 
 	return long, short
 }

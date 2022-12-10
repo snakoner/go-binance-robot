@@ -89,7 +89,7 @@ func WebSocketTracking(r *robot.Robot, symbol string, close chan float64, t chan
 func WebSocketRun(r *robot.Robot, symbol string, numberOfKlines int) {
 	// for logger
 	var s string
-	logger := logger.New("../../envelope.log")
+	logger := logger.New(fmt.Sprintf("../../envelope_%s.log", symbol))
 	logger.Open()
 	// get data
 	if err := GetHistoricalKlines(r, symbol, numberOfKlines); err != nil {

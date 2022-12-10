@@ -10,10 +10,16 @@ import (
 var _ = fmt.Sprintf("%d", 0)
 
 func main() {
-	robot := robot.New()
-	robot.Print()
+	symbols := []string{"ADA", "AVAX", "ETH"}
+	for _, s := range symbols {
+		robot := robot.New()
+		robot.Print()
 
-	// binance.WebSocketGetClose(robot)
-	binance.WebSocketRun(robot, "ADA", 500)
+		// binance.WebSocketGetClose(robot)
+		go binance.WebSocketRun(robot, s, 500)
+	}
 
+	for {
+
+	}
 }
