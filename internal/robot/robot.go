@@ -28,11 +28,13 @@ type Robot struct {
 	StartBalance      float64 /* value to buy on */
 	TakeProfit        float64 /* take profit value in percent */
 	StopLoss          float64 /* stop loss value in percent */
-	TradingSession    Trade
-	Strategy          *strategy.Strategy
+	TradingSession    []Trade
+	MaxTokensTrack    int
 }
 
 type Trade struct {
+	Root                 *Robot
+	Strategy             *strategy.Strategy
 	Active               bool    /* deal is active or not */
 	Token                string  /* token name */
 	BuyValue             float64 /* value bought on */
@@ -47,9 +49,10 @@ type Trade struct {
 }
 
 type TradingResult struct {
-	Profit    float64
-	StartTime time.Time
-	EndTime   time.Time
+	ProfitPerc  float64
+	ProfitPrice float64
+	StartTime   time.Time
+	EndTime     time.Time
 }
 
 func New() *Robot {
@@ -74,21 +77,31 @@ func New() *Robot {
 	robot.StartBalance, _ = strconv.ParseFloat(os.Getenv("start_balance"), 64)
 	robot.TakeProfit, _ = strconv.ParseFloat(os.Getenv("take_profit"), 64)
 	robot.StopLoss, _ = strconv.ParseFloat(os.Getenv("stop_loss"), 64)
-	robot.Strategy = strategy.New()
+	robot.MaxTokensTrack, _ = strconv.Atoi(os.Getenv("max_tokens_track"))
+	// robot.Strategy = strategy.New()
 
-	for _, name := range robot.StrategyNames {
-		switch name {
-		case "envelope":
-			robot.Strategy.Add(indicators.Envelope, name)
-			break
-		case "divergence":
-			robot.Strategy.Add(indicators.Divergence, name)
-			break
-		case "rsi":
-			//robot.Strategy.Add(indicators.Rsi, name)
-			break
-		default:
-			log.Fatalf("Unknown indicator: %s\n", name)
+	for i, symbol := range robot.Tokens {
+		ts := Trade{
+			Token: symbol,
+		}
+		robot.TradingSession = append(robot.TradingSession, ts)
+		robot.TradingSession[i].Root = robot
+		robot.TradingSession[i].Strategy = new(strategy.Strategy)
+
+		for _, name := range robot.StrategyNames {
+			switch name {
+			case "envelope":
+				robot.TradingSession[i].Strategy.Add(indicators.Envelope, name)
+				break
+			case "divergence":
+				robot.TradingSession[i].Strategy.Add(indicators.Divergence, name)
+				break
+			case "rsi":
+				//robot.Strategy.Add(indicators.Rsi, name)
+				break
+			default:
+				log.Fatalf("Unknown indicator: %s\n", name)
+			}
 		}
 	}
 
@@ -109,7 +122,7 @@ func (r *Robot) Print() {
 	fmt.Println(strings.ToUpper("stop_loss: "), r.StopLoss)
 	fmt.Println(strings.ToUpper("take_profit: "), r.TakeProfit)
 
-	fmt.Println(r.Strategy.GetName())
+	//fmt.Println(r.Strategy.GetName())
 
 	fmt.Println()
 }

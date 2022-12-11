@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"sync"
 
 	"github.com/go-binance-robot/internal/binance"
 	"github.com/go-binance-robot/internal/robot"
@@ -9,17 +11,21 @@ import (
 
 var _ = fmt.Sprintf("%d", 0)
 
+func Run() {
+	wg := &sync.WaitGroup{}
+	r := robot.New()
+	wg.Add(len(r.Tokens))
+	for i := range r.Tokens {
+		go func(wg *sync.WaitGroup, ts *robot.Trade) {
+			binance.WebSocketRun(ts, 500)
+			wg.Done()
+			log.Printf("%s socket finished\n", ts.Token)
+		}(wg, &r.TradingSession[i])
+	}
+	wg.Wait()
+}
+
 func main() {
-	symbols := []string{"ADA", "AVAX", "ETH"}
-	for _, s := range symbols {
-		robot := robot.New()
-		robot.Print()
-
-		// binance.WebSocketGetClose(robot)
-		go binance.WebSocketRun(robot, s, 500)
-	}
-
-	for {
-
-	}
+	// symbols := []string{"ADA", "AVAX", "ETH", "MATIC", "SOL", "FTM"}
+	Run()
 }
