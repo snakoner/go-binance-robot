@@ -160,41 +160,30 @@ func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
 				logger.Write(s)
 			}
 
-			if curr <= ts.StopLossValue {
-				// [todo] sell with loss
+			if curr <= ts.StopLossValue || curr >= ts.TakeProfitValue {
+				// [todo] sell
 				ts.Active = false
 				ts.Result.EndTime = time.Now()
 				ts.Result.ProfitPrice = priceChange
 				ts.Result.ProfitPerc = priceChange / ts.OpenPrice
-				s = fmt.Sprint("\n##########\nClose deal\n###########\n")
-				logger.Write(s)
-
-				s = fmt.Sprintf("SL: %f, TP:%f", ts.StopLossValue, ts.TakeProfitValue)
-				logger.Write(s)
-				s = fmt.Sprintf("Price sell: %f", curr)
-				logger.Write(s)
-				s = fmt.Sprintf("Deal is closed due SL: %f", priceChange)
-				logger.Write(s)
-
-				break
-			} else if curr >= ts.TakeProfitValue { // [todo] sell with profit
-				ts.Active = false
-				ts.Result.EndTime = time.Now()
-				ts.Result.ProfitPrice = priceChange
-				ts.Result.ProfitPerc = priceChange / ts.OpenPrice
-
+				
+				// logging
 				s = fmt.Sprint("\n##########\nClose deal\n###########\n")
 				logger.Write(s)
 				s = fmt.Sprintf("SL: %f, TP:%f", ts.StopLossValue, ts.TakeProfitValue)
 				logger.Write(s)
 				s = fmt.Sprintf("Price sell: %f", curr)
 				logger.Write(s)
-				s = fmt.Sprintf("Deal is closed due TP: %f", priceChange)
+				if curr <= ts.StopLossValue {						
+					s = fmt.Sprintf("Deal is closed due SL: %f", priceChange)
+				} else {
+					s = fmt.Sprintf("Deal is closed due TP: %f", priceChange)
+				}
 				logger.Write(s)
 
 				break
-			}
-
+			} 
+			
 			diff := curr - ts.LastPriceForSLChange
 			prev = curr
 
