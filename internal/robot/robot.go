@@ -7,10 +7,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-binance-robot/internal/indicators"
 	"github.com/go-binance-robot/internal/strategy"
+	"github.com/go-binance-robot/internal/binance"
 	"github.com/joho/godotenv"
 )
 
@@ -106,6 +108,19 @@ func New() *Robot {
 	}
 
 	return robot
+}
+
+func (r *Robot) Run() {
+	wg := &sync.WaitGroup{}
+	wg.Add(len(r.Tokens))
+	for i := range r.Tokens {
+		go func(wg *sync.WaitGroup, ts *robot.Trade) {
+			binance.WebSocketRun(ts, 500)
+			wg.Done()
+			log.Printf("%s socket finished\n", ts.Token)
+		}(wg, &r.TradingSession[i])
+	}
+	wg.Wait()
 }
 
 func (r *Robot) Print() {
