@@ -1,7 +1,7 @@
 package indicators
 
 const (
-	rsiLength = 14
+	rsiLen = 14
 	rsiLongLimit = 30.0
 	rsiShortLimit = 70.0
 )
@@ -19,8 +19,8 @@ func Rsi(data []float64) (bool, bool) {
 		}
 	}
 
-	emaU := Ema(u, rsiLength)
-	emaD := Ema(d, rsiLength)
+	emaU := Ema(u, rsiLen)
+	emaD := Ema(d, rsiLen)
 
 	for i := 0; i < len(data) - 1; i++ {
 		r[i] = 100.0
