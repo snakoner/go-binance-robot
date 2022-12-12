@@ -87,22 +87,24 @@ func WebSocketTracking(ts *robot.Trade, close chan float64, t chan time.Time) {
 
 // Function to run from main
 func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
-	// for logger
+	// logger
 	var s string
 	logger := logger.New(fmt.Sprintf("../../envelope_%s.log", ts.Token))
 	logger.Open()
-	// get data
+	defer logger.Close()
+	
+	// get stock data
 	if err := GetHistoricalKlines(ts, numberOfKlines); err != nil {
 		log.Fatal(err)
 		return
 	}
 
-	//fmt.Println("Hello")
 	// web socket tracking
 	close := make(chan float64)
 	t := make(chan time.Time)
 	go WebSocketTracking(ts, close, t)
-
+	
+	// get price, timestamp from WebSocketTracking goroutine
 	var prev, curr float64
 	var tm time.Time
 
@@ -119,22 +121,15 @@ func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
 				ts.Close = ts.Close[1:]
 			}
 
-			//fmt.Println(prev, curr)
 			ts.LastTime = tm
 			ts.Strategy.Apply(ts.Close)
 			result := ts.Strategy.IsLong()
-			//fmt.Println(result)
 			if result {
 				s = "Envelope long OK"
 				logger.Write(s)
 			}
 
-			// result = true
-
-			// log.Println(r.TradingSession.Close[len(r.TradingSession.Close)-2:], "long: ", result)
-
 			if result && ts.Active == false {
-				// [todo] buy, set sl and tp and set fields
 				ts.Active = true
 				ts.BuyValue = ts.Root.StartBalance // [todo]
 				ts.OpenPrice, _ = GetLastPrice(ts.Root, ts.Token)
@@ -144,7 +139,7 @@ func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
 				ts.Quantity = ts.BuyValue / ts.OpenPrice
 				ts.Result.StartTime = time.Now()
 
-				fmt.Printf("Strategy started for %s\n", ts.Token)
+				log.Printf("Strategy started for %s\n", ts.Token)
 
 				break
 			}
@@ -156,13 +151,9 @@ func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
 	if ts.Active {
 		for ts.Active {
 			prev = curr
-			// fmt.Println("Waiting for change 0")
 			curr = <-close
 			<-t
-			// fmt.Println("Waiting for change 1")
 			priceChange := ts.Quantity*curr - ts.BuyValue
-			// s = fmt.Sprintf("Price change from beginning: %.4f", priceChange)
-			// logger.Write(s)
 			if curr != prev {
 				profit := (curr - ts.OpenPrice) / ts.OpenPrice * 100.0
 				s = fmt.Sprintf("Profit: %.3f perc\n", profit)
@@ -208,7 +199,7 @@ func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
 			prev = curr
 
 			if trailing.RecalcTrailingStop(ts, diff) {
-				// change OCO order
+				// [todo] change OCO order
 				s = fmt.Sprintf("SL: %f, TP:%f", ts.StopLossValue, ts.TakeProfitValue)
 				logger.Write(s)
 				ts.LastPriceForSLChange = curr
