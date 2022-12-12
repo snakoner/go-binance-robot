@@ -7,7 +7,7 @@ func Sma(data []float64, n int) []float64 {
 		for _, val := range data[i:i+n] {
 			result[i] += val
 		}
-		result[i] /= n
+		result[i] /= float64(n)
 	}
 	
 	return result
