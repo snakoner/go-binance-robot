@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2"
-	"github.com/go-binance-robot/internal/logger"
 	"github.com/go-binance-robot/internal/robot"
+	"github.com/go-binance-robot/pkg/logger"
 )
 
 // Get N = numberOfKlines historical klines
