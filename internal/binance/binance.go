@@ -10,7 +10,6 @@ import (
 	"github.com/adshao/go-binance/v2"
 	"github.com/go-binance-robot/internal/logger"
 	"github.com/go-binance-robot/internal/robot"
-	"github.com/go-binance-robot/internal/trailing"
 )
 
 // Get N = numberOfKlines historical klines
@@ -89,8 +88,10 @@ func WebSocketTracking(ts *robot.Trade, close chan float64, t chan time.Time) {
 func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
 	// for logger
 	var s string
-	logger := logger.New(fmt.Sprintf("../../envelope_%s.log", ts.Token))
+	logger := logger.New(fmt.Sprintf("../../log/envelope_%s.log", ts.Token))
 	logger.Open()
+	defer logger.Close()
+	profits := []float64{}
 	// get data
 	if err := GetHistoricalKlines(ts, numberOfKlines); err != nil {
 		log.Fatal(err)
@@ -143,7 +144,8 @@ func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
 				ts.LastPriceForSLChange = ts.OpenPrice
 				ts.Quantity = ts.BuyValue / ts.OpenPrice
 				ts.Result.StartTime = time.Now()
-
+				s = fmt.Sprintf("Price: %f", ts.OpenPrice)
+				logger.Write(s)
 				fmt.Printf("Strategy started for %s\n", ts.Token)
 
 				break
@@ -165,8 +167,9 @@ func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
 			// logger.Write(s)
 			if curr != prev {
 				profit := (curr - ts.OpenPrice) / ts.OpenPrice * 100.0
-				s = fmt.Sprintf("Profit: %.3f perc\n", profit)
+				s = fmt.Sprintf("Profit: %.3f o/o", profit)
 				logger.Write(s)
+				profits = append(profits, profit)
 			}
 
 			if curr <= ts.StopLossValue {
@@ -207,7 +210,7 @@ func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
 			diff := curr - ts.LastPriceForSLChange
 			prev = curr
 
-			if trailing.RecalcTrailingStop(ts, diff) {
+			if recalcTrailingStop(ts, diff) {
 				// change OCO order
 				s = fmt.Sprintf("SL: %f, TP:%f", ts.StopLossValue, ts.TakeProfitValue)
 				logger.Write(s)
@@ -216,4 +219,29 @@ func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
 		}
 
 	}
+	if len(profits) != 0 {
+		s = fmt.Sprintf("Max profit: %f", maxFloat(profits))
+		logger.Write(s)
+	}
+}
+
+func maxFloat(s []float64) float64 {
+	max := s[0]
+
+	for _, val := range s {
+		if max < val {
+			max = val
+		}
+	}
+	return max
+}
+
+func recalcTrailingStop(ts *robot.Trade, diff float64) bool {
+	if diff > 0 {
+		ts.StopLossValue += diff
+		ts.TakeProfitValue += diff
+		return true
+	}
+
+	return false
 }

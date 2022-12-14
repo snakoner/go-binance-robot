@@ -4,3 +4,5 @@
 .DS_Store
 /cmd/.DS_Store
 /cmd/app/.DS_Store
+/log/*
+

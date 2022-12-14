@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/go-binance-robot/internal/binance"
 	"github.com/go-binance-robot/internal/robot"
@@ -11,21 +12,39 @@ import (
 
 var _ = fmt.Sprintf("%d", 0)
 
-func Run() {
-	wg := &sync.WaitGroup{}
-	r := robot.New()
-	wg.Add(len(r.Tokens))
-	for i := range r.Tokens {
-		go func(wg *sync.WaitGroup, ts *robot.Trade) {
-			binance.WebSocketRun(ts, 500)
-			wg.Done()
-			log.Printf("%s socket finished\n", ts.Token)
-		}(wg, &r.TradingSession[i])
+func RunInfinitely(r *robot.Robot) {
+	tokenFinished := make(map[string]bool)
+	mu := sync.Mutex{}
+	for _, token := range r.Tokens {
+		tokenFinished[token] = true
 	}
-	wg.Wait()
+
+	for {
+		for i := range r.Tokens {
+			mu.Lock()
+			finished := tokenFinished[r.Tokens[i]]
+			mu.Unlock()
+			time.Sleep(2 * time.Second)
+
+			if finished {
+				go func(ts *robot.Trade, tokenFin *map[string]bool) {
+					mu.Lock()
+					(*tokenFin)[ts.Token] = false
+					mu.Unlock()
+
+					binance.WebSocketRun(ts, 500)
+					log.Printf("%s socket finished\n", ts.Token)
+
+					mu.Lock()
+					(*tokenFin)[ts.Token] = true
+					mu.Unlock()
+				}(&r.TradingSession[i], &tokenFinished)
+			}
+		}
+	}
 }
 
 func main() {
-	// symbols := []string{"ADA", "AVAX", "ETH", "MATIC", "SOL", "FTM"}
-	Run()
+	r := robot.New()
+	RunInfinitely(r)
 }
