@@ -1,4 +1,4 @@
-package robot
+package trade
 
 import (
 	// "fmt"
@@ -11,6 +11,9 @@ import (
 
 	"github.com/go-binance-robot/internal/indicators"
 	"github.com/go-binance-robot/internal/strategy"
+
+	//"github.com/go-binance-robot/internal/trade"
+
 	"github.com/joho/godotenv"
 )
 
@@ -46,6 +49,8 @@ type Trade struct {
 	TakeProfitValue      float64
 	LastPriceForSLChange float64
 	Result               TradingResult
+	FuturesOrder         *FuturesOrder
+	Precision            float64
 }
 
 type TradingResult struct {

@@ -26,6 +26,6 @@ func findLocalMins(data []float64) []stockPoint {
 	return stockPoints
 }
 
-func Divergence(data []float64) (bool, bool) {
+func Divergence(data []float64, price chan float64) (bool, bool) {
 	return false, false
 }

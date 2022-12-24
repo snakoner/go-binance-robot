@@ -6,45 +6,32 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-binance-robot/internal/binance"
-	"github.com/go-binance-robot/internal/robot"
+	"github.com/go-binance-robot/internal/trade"
 )
 
 var _ = fmt.Sprintf("%d", 0)
 
-func RunInfinitely(r *robot.Robot) {
-	tokenFinished := make(map[string]bool)
+func RunInfinitely(r *trade.Robot) {
 	mu := sync.Mutex{}
-	for _, token := range r.Tokens {
-		tokenFinished[token] = true
+	wg := new(sync.WaitGroup)
+
+	wg.Add(len(r.Tokens))
+	for i := range r.Tokens {
+		mu.Lock()
+		trade.GetPrecision(&r.TradingSession[i])
+		mu.Unlock()
+		time.Sleep(2 * time.Second)
+
+		go func(ts *trade.Trade) {
+			trade.WebSocketRun(ts, 500)
+			log.Printf("%s socket finished\n", ts.Token)
+			wg.Done()
+		}(&r.TradingSession[i])
 	}
-
-	for {
-		for i := range r.Tokens {
-			mu.Lock()
-			finished := tokenFinished[r.Tokens[i]]
-			mu.Unlock()
-			time.Sleep(2 * time.Second)
-
-			if finished {
-				go func(ts *robot.Trade, tokenFin *map[string]bool) {
-					mu.Lock()
-					(*tokenFin)[ts.Token] = false
-					mu.Unlock()
-
-					binance.WebSocketRun(ts, 500)
-					log.Printf("%s socket finished\n", ts.Token)
-
-					mu.Lock()
-					(*tokenFin)[ts.Token] = true
-					mu.Unlock()
-				}(&r.TradingSession[i], &tokenFinished)
-			}
-		}
-	}
+	wg.Wait()
 }
 
 func main() {
-	r := robot.New()
+	r := trade.New()
 	RunInfinitely(r)
 }

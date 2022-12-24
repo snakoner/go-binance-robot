@@ -1,4 +1,4 @@
-package binance
+package trade
 
 import (
 	"context"
@@ -8,12 +8,11 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2"
-	"github.com/go-binance-robot/internal/robot"
 	"github.com/go-binance-robot/pkg/logger"
 )
 
 // Get N = numberOfKlines historical klines
-func GetHistoricalKlines(ts *robot.Trade, numberOfKlines int) error {
+func GetHistoricalKlines(ts *Trade, numberOfKlines int) error {
 	client := binance.NewClient(ts.Root.BinanceApiPublic, ts.Root.BinanceApiPrivate)
 	klines, err := client.NewKlinesService().Symbol(ts.Token + ts.Root.StableCurrency).
 		Interval(ts.Root.Timeframe).Limit(numberOfKlines).Do(context.Background())
@@ -34,7 +33,7 @@ func GetHistoricalKlines(ts *robot.Trade, numberOfKlines int) error {
 }
 
 // Get penultimate close price
-func GetPenultimatePrice(ts *robot.Trade) (float64, error) {
+func GetPenultimatePrice(ts *Trade) (float64, error) {
 	client := binance.NewClient(ts.Root.BinanceApiPublic, ts.Root.BinanceApiPrivate)
 	klines, err := client.NewKlinesService().Symbol(ts.Token + ts.Root.StableCurrency).
 		Interval(ts.Root.Timeframe).Limit(2).Do(context.Background())
@@ -48,7 +47,7 @@ func GetPenultimatePrice(ts *robot.Trade) (float64, error) {
 }
 
 // Get last close price
-func GetLastPrice(r *robot.Robot, symbol string) (float64, error) {
+func GetLastPrice(r *Robot, symbol string) (float64, error) {
 	client := binance.NewClient(r.BinanceApiPublic, r.BinanceApiPrivate)
 	klines, err := client.NewKlinesService().Symbol(symbol + r.StableCurrency).
 		Interval(r.Timeframe).Limit(1).Do(context.Background())
@@ -62,7 +61,7 @@ func GetLastPrice(r *robot.Robot, symbol string) (float64, error) {
 }
 
 // Goroutine function to return time and close price for token
-func WebSocketTracking(ts *robot.Trade, close chan float64, t chan time.Time) {
+func WebSocketTracking(ts *Trade, close chan float64, t chan time.Time) {
 	fmt.Printf("Web socket is running: %s\n", ts.Token)
 	wsKlineHandler := func(event *binance.WsKlineEvent) {
 		currClose, _ := strconv.ParseFloat(event.Kline.Close, 64)
@@ -85,7 +84,7 @@ func WebSocketTracking(ts *robot.Trade, close chan float64, t chan time.Time) {
 }
 
 // Function to run from main
-func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
+func WebSocketRun(ts *Trade, numberOfKlines int) {
 	// logger
 	var s string
 	logger := logger.New(fmt.Sprintf("../../log/envelope_%s.log", ts.Token))
@@ -121,14 +120,16 @@ func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
 			}
 
 			ts.LastTime = tm
-			ts.Strategy.Apply(ts.Close)
+			ts.Strategy.Apply(ts.Close, close)
 			result := ts.Strategy.IsLong()
+			result = true
 			if result {
 				s = "Envelope long OK"
 				logger.Write(s)
 			}
 
 			if result && ts.Active == false {
+
 				ts.Active = true
 				ts.BuyValue = ts.Root.StartBalance // [todo]
 				ts.OpenPrice, _ = GetLastPrice(ts.Root, ts.Token)
@@ -137,6 +138,15 @@ func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
 				ts.LastPriceForSLChange = ts.OpenPrice
 				ts.Quantity = ts.BuyValue / ts.OpenPrice
 				ts.Result.StartTime = time.Now()
+
+				err := CreateFuturesOrder(ts)
+				if err != nil {
+					log.Fatal(err)
+					ts.Active = false
+
+					return
+				}
+
 				s = fmt.Sprintf("Price: %f", ts.OpenPrice)
 				logger.Write(s)
 				fmt.Printf("Strategy started for %s\n", ts.Token)
@@ -158,8 +168,8 @@ func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
 			priceChange := ts.Quantity*curr - ts.BuyValue
 			if curr != prev {
 				profit := (curr - ts.OpenPrice) / ts.OpenPrice * 100.0
-				s = fmt.Sprintf("Profit: %.3f o/o", profit)
-				logger.Write(s)
+				// s = fmt.Sprintf("Profit: %.3f o/o", profit)
+				// logger.Write(s)
 				profits = append(profits, profit)
 			}
 
@@ -171,7 +181,7 @@ func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
 				ts.Result.ProfitPerc = priceChange / ts.OpenPrice
 
 				// logging
-				s = fmt.Sprint("\n##########\nClose deal\n###########\n")
+				s = fmt.Sprint("\n##########\nClose deal\n###########")
 				logger.Write(s)
 				s = fmt.Sprintf("SL: %f, TP:%f", ts.StopLossValue, ts.TakeProfitValue)
 				logger.Write(s)
@@ -200,7 +210,7 @@ func WebSocketRun(ts *robot.Trade, numberOfKlines int) {
 
 	}
 	if len(profits) != 0 {
-		s = fmt.Sprintf("Max profit: %f", maxFloat(profits))
+		s = fmt.Sprintf("Max profit: %f\n\n\n", maxFloat(profits))
 		logger.Write(s)
 	}
 }
@@ -216,7 +226,7 @@ func maxFloat(s []float64) float64 {
 	return max
 }
 
-func recalcTrailingStop(ts *robot.Trade, diff float64) bool {
+func recalcTrailingStop(ts *Trade, diff float64) bool {
 	if diff > 0 {
 		ts.StopLossValue += diff
 		ts.TakeProfitValue += diff

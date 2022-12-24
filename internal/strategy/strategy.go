@@ -6,7 +6,7 @@ import (
 
 type StrategyElement struct {
 	Name  string
-	Func  func([]float64) (bool, bool)
+	Func  func([]float64, chan float64) (bool, bool)
 	Long  bool
 	Short bool
 }
@@ -19,7 +19,7 @@ func New() *Strategy {
 	return &Strategy{}
 }
 
-func (this *Strategy) Add(f func([]float64) (bool, bool), name string) {
+func (this *Strategy) Add(f func([]float64, chan float64) (bool, bool), name string) {
 	se := &StrategyElement{
 		Func: f,
 		Name: name,
@@ -28,12 +28,12 @@ func (this *Strategy) Add(f func([]float64) (bool, bool), name string) {
 }
 
 // Calculate if long, short OK for each strategy element
-func (this *Strategy) Apply(data []float64) {
+func (this *Strategy) Apply(data []float64, price chan float64) {
 	wg := new(sync.WaitGroup)
 	for _, se := range this.Elements {
 		wg.Add(1)
 		go func(se *StrategyElement) {
-			se.Long, se.Short = se.Func(data)
+			se.Long, se.Short = se.Func(data, price)
 			wg.Done()
 		}(se)
 	}
